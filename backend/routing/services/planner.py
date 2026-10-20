@@ -1,0 +1,204 @@
+"""
+Orchestrates: geocode → directions → sample → weather → risk → metrics → recommend → heatmap.
+
+Prefetch weather for unique grid cells once, then score routes from cache.
+Heatmap is built only along the recommended corridor.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+from routing.services import geo, weather
+from routing.services.geo import Place, RoutingError
+from routing.services.metrics import ScoredCheckpoint, compute_metrics
+from routing.services.recommend import pick_recommended, why_recommended
+from routing.services.risk import assess_risk
+from routing.services.sampling import Checkpoint, sample_checkpoints
+from routing.services.weather import WeatherError
+
+# 49 slots → hour offsets 0..48 inclusive (doc: 0–48h forecast slider)
+HEATMAP_HOURS = 49
+# Weather already cached for route checkpoints; denser glow for a real corridor heatmap
+HEATMAP_MAX_POINTS = 36
+
+
+@dataclass
+class AnalyzeInput:
+    origin: str
+    destination: str
+    departure_at: datetime
+    load_weight_lb: float
+    sample_interval_miles: int
+    origin_coords: tuple[float, float] | None = None
+    destination_coords: tuple[float, float] | None = None
+
+
+def analyze(data: AnalyzeInput) -> dict[str, Any]:
+    origin = _resolve(data.origin, data.origin_coords)
+    destination = _resolve(data.destination, data.destination_coords)
+    raw_routes = geo.directions(origin, destination)
+
+    route_cps = [
+        sample_checkpoints(
+            raw.geometry,
+            total_miles=raw.distance_miles,
+            duration_minutes=raw.duration_minutes,
+            departure_at=data.departure_at,
+            interval_miles=float(data.sample_interval_miles),
+        )
+        for raw in raw_routes
+    ]
+
+    locs: list[tuple[float, float]] = [
+        (cp.lat, cp.lng) for cps in route_cps for cp in cps
+    ]
+    weather.prefetch(locs)
+
+    built: list[dict[str, Any]] = []
+    metrics_pairs: list[tuple[str, Any]] = []
+
+    for raw, cps in zip(raw_routes, route_cps):
+        scored_for_metrics: list[ScoredCheckpoint] = []
+        checkpoint_payloads: list[dict[str, Any]] = []
+
+        for cp in cps:
+            wx = weather.sample_at(cp.lat, cp.lng, cp.eta)
+            risk = assess_risk(
+                wind_mph=wx.wind_mph,
+                rain_in_hr=wx.rain_in_hr,
+                snow_in_hr=wx.snow_in_hr,
+                load_weight_lb=data.load_weight_lb,
+            )
+            scored_for_metrics.append(
+                ScoredCheckpoint(mile=cp.mile, risk=risk.risk, score=risk.score)
+            )
+            checkpoint_payloads.append(
+                {
+                    "mile": cp.mile,
+                    "eta": cp.eta.isoformat(),
+                    "lng": round(cp.lng, 6),
+                    "lat": round(cp.lat, 6),
+                    "weather": {
+                        "wind_mph": round(wx.wind_mph, 1),
+                        "rain_in_hr": round(wx.rain_in_hr, 3),
+                        "snow_in_hr": round(wx.snow_in_hr, 3),
+                        "temperature_f": round(wx.temperature_f, 1)
+                        if wx.temperature_f is not None
+                        else None,
+                        "observed_at": wx.observed_at,
+                    },
+                    "risk": risk.risk,
+                    "score": risk.score,
+                    "risk_reasons": risk.reasons,
+                }
+            )
+
+        metrics = compute_metrics(
+            scored_for_metrics,
+            duration_minutes=raw.duration_minutes,
+            total_miles=raw.distance_miles,
+        )
+        metrics_pairs.append((raw.id, metrics))
+        built.append(
+            {
+                "id": raw.id,
+                "summary": raw.summary,
+                "distance_miles": round(raw.distance_miles, 1),
+                "duration_minutes": round(raw.duration_minutes, 1),
+                "geometry": raw.geometry,
+                "checkpoints": checkpoint_payloads,
+                "metrics": {
+                    "severe_miles": metrics.severe_miles,
+                    "high_miles": metrics.high_miles,
+                    "no_travel_miles": metrics.no_travel_miles,
+                    "avg_risk": metrics.avg_risk,
+                    "travel_time_minutes": metrics.travel_time_minutes,
+                    "total_miles": metrics.total_miles,
+                },
+                "is_recommended": False,
+                "recommendation_reason": "",
+            }
+        )
+
+    recommended_id = pick_recommended(metrics_pairs)
+    metrics_by_id = {rid: m for rid, m in metrics_pairs}
+    for route in built:
+        if route["id"] == recommended_id:
+            route["is_recommended"] = True
+            others = [m for rid, m in metrics_pairs if rid != recommended_id]
+            route["recommendation_reason"] = why_recommended(
+                metrics_by_id[route["id"]], others
+            )
+
+    # Reuse scored checkpoint locations (already weather-cached) for the 48h glow —
+    # avoids a second Open-Meteo round-trip.
+    heat_idx = next((i for i, r in enumerate(built) if r["is_recommended"]), 0)
+    heat_cps = _subsample_checkpoints(route_cps[heat_idx], HEATMAP_MAX_POINTS)
+
+    heatmap = {
+        "hours": HEATMAP_HOURS,
+        "start": data.departure_at.isoformat(),
+        "points": [
+            {
+                "lng": round(cp.lng, 6),
+                "lat": round(cp.lat, 6),
+                "mile": cp.mile,
+                "hours": [
+                    {
+                        "hour_offset": h["hour_offset"],
+                        "score": h["score"],
+                        "risk": h["risk"],
+                        "time": h["time"],
+                        "wind_mph": h["wind_mph"],
+                    }
+                    for h in weather.hourly_risk_series(
+                        cp.lat,
+                        cp.lng,
+                        start=data.departure_at,
+                        hours=HEATMAP_HOURS,
+                        load_weight_lb=data.load_weight_lb,
+                        assess_fn=assess_risk,
+                    )
+                ],
+            }
+            for cp in heat_cps
+        ],
+    }
+
+    return {
+        "origin": {"label": origin.label, "lng": origin.lng, "lat": origin.lat},
+        "destination": {
+            "label": destination.label,
+            "lng": destination.lng,
+            "lat": destination.lat,
+        },
+        "departure_at": data.departure_at.isoformat(),
+        "load_weight_lb": data.load_weight_lb,
+        "sample_interval_miles": data.sample_interval_miles,
+        "routes": built,
+        "recommended_route_id": recommended_id,
+        "heatmap": heatmap,
+    }
+
+
+def _resolve(label: str, coords: tuple[float, float] | None) -> Place:
+    if coords and len(coords) == 2:
+        return Place(label=label, lng=float(coords[0]), lat=float(coords[1]))
+    return geo.geocode(label)
+
+
+def _subsample_checkpoints(cps: list[Checkpoint], max_points: int) -> list[Checkpoint]:
+    if not cps:
+        return []
+    if len(cps) <= max_points:
+        return cps
+    if max_points == 1:
+        return [cps[0]]
+    step = (len(cps) - 1) / (max_points - 1)
+    idxs = sorted({round(i * step) for i in range(max_points)})
+    return [cps[i] for i in idxs]
+
+
+__all__ = ["AnalyzeInput", "analyze", "RoutingError", "WeatherError"]

@@ -1,0 +1,60 @@
+# Weather-Aware Truck Routing — Build Plan
+
+## Goal (in scope only)
+
+Build a **React + Django** app where a driver enters origin, destination, departure date/time, and load weight; the app returns **3 routes**, weather-sampled checkpoints, risk scores (with load rules), a **recommended route**, a map of all of that, and a **corridor weather heatmap with a 48-hour forecast slider**.
+
+**Out of scope:** HOS/ELD logs, multi-stop pickup chains, auth, social features, truck animations, anything not in the brief.
+
+**Cost constraint:** $0 — free APIs and free hosting only (Nominatim, OSRM, Open-Meteo, MapLibre/OpenFreeMap, Vercel Hobby).
+
+## Decoded rules (from garbled MD — treat as source of truth)
+
+**Risk bands** (worst of wind / rain / snow at a checkpoint; then apply load overrides):
+
+| Level | Wind (mph) | Rain (in/hr) | Snow (in/hr) |
+| --- | --- | --- | --- |
+| Low | <25 | <0.10 | <0.5 |
+| Moderate | 25–34 | 0.10–0.25 | 0.5–1.0 |
+| High | 35–44 | 0.25–0.50 | 1.0–2.0 |
+| Severe | 45–54 | 0.50–1.00 | 2.0–3.0 |
+| No Travel | ≥55 | >1.00 | >3.0 |
+
+**Load overrides:**
+
+- Wind **≥55 mph** → **No Travel** (any load)
+- Wind **45–54 mph** and weight **>30,000 lb** → **No Travel**
+- Wind **35–44 mph** and weight **>40,000 lb** → **Severe**
+
+**Recommendation order (strict):** fewest Severe miles → fewest High miles → lowest average risk → shortest travel time.
+
+**Doc typo:** `0648 hour` = **48-hour** forecast slider.
+
+## Locked free stack
+
+| Piece | Choice |
+| --- | --- |
+| Frontend | Vite + React + TypeScript |
+| Map | MapLibre GL + OpenFreeMap (no token) |
+| Backend | Django 4 + DRF |
+| Geocode | Nominatim |
+| 3 routes | OSRM (`alternatives` + via midpoints if needed) |
+| Weather | Open-Meteo hourly |
+| Host | Vercel Hobby |
+
+## Primary endpoint
+
+`POST /api/analyze/`
+
+Request: `{ origin, destination, departure_at, load_weight_lb, sample_interval_miles: 10|25|50 }`
+
+Response: `{ routes: [...], recommended_route_id, heatmap: {...} }`
+
+## Definition of done
+
+- [x] Origin, destination, departure, load weight, interval
+- [x] Up to 3 real routes on the map with checkpoints, ETAs, risk colors, summaries
+- [x] Risk + load rules; recommendation follows the 4 preferences
+- [x] Weather heatmap + 48h slider along the corridor
+- [x] GitHub + hosted URL + Loom script
+- [x] Zero paid API keys required
