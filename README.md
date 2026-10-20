@@ -2,7 +2,7 @@
 
 A React + Django tool for drivers who need the **safest practical corridor** when weather, cargo weight, and schedule all matter.
 
-> **Repository:** https://github.com/SheharyarAhmad1991/weather-aware-truck-routing  
+> **Repository:** https://github.com/SheharyarAhmad1991/Weather-Aware-Truck-Routing  
 > **Web app:** https://weather-aware-frontend.vercel.app  
 > **Backend API:** https://weather-aware-backend.vercel.app  
 
