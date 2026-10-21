@@ -1,22 +1,16 @@
-/**
- * Street map (default) + satellite toggle, multi-color routes, path scrubber.
- * Uses Mapbox GL JS with free Esri raster tiles (no API key).
- */
 import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import gsap from "gsap";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { AnalyzeResponse, Checkpoint, RiskLevel, RouteResult } from "../types";
 import { RISK_COLORS, RISK_LABELS } from "../lib/riskColors";
+import { ROUTE_PALETTE } from "../lib/routePalette";
 import { buildRouteIndex, pointAtFraction, sliceByFraction, type LngLat } from "../lib/routeGeo";
 import "./RouteMap.css";
 
 type BasemapMode = "streets" | "satellite";
 
-/** Route colors: navy / rust / olive — readable on street + satellite */
-export const ROUTE_PALETTE = ["#1e4d8c", "#9a3412", "#3f6212"] as const;
-
-/** Free Esri street + satellite rasters (no API key); toggle via layer visibility. */
+/** Free Esri street + satellite rasters (no API key). */
 const FREE_STYLE: mapboxgl.Style = {
   version: 8,
   sources: {
@@ -207,7 +201,6 @@ export function RouteMap({
         killTweens(tweensRef.current);
         clearRouteLayers(map);
         tweensRef.current = drawRoutesAnimated(map, data.routes, selectedId);
-        // Auto-zoom to trip corridor
         window.setTimeout(() => fitToRoutes(map, data.routes), 80);
         window.setTimeout(() => fitToRoutes(map, data.routes), 700);
       } else {
@@ -230,7 +223,6 @@ export function RouteMap({
     updateHeatmap(map, data, forecastHour);
   }, [data, forecastHour]);
 
-  // Truck + traveled path when scrubbing
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current || !selectedRoute || !routeIndex) return;
@@ -257,7 +249,6 @@ export function RouteMap({
     }
   }, [selectedRoute, routeIndex, progress]);
 
-  // Remove truck when no data
   useEffect(() => {
     if (data) return;
     truckRef.current?.remove();
@@ -304,15 +295,12 @@ export function RouteMap({
       )}
 
       {data && selectedRoute && (
-        <div className="map-controls" aria-label="Route and forecast controls">
-          <div className="map-controls__row">
+        <div className="map-controls">
+          <div className="map-controls__block">
             <div className="map-controls__head">
               <strong>Trip progress</strong>
               <span>
-                {milesDone}/{milesTotal} mi
-                {weatherAtTruck
-                  ? ` · ${RISK_LABELS[weatherAtTruck.risk]}`
-                  : ""}
+                {milesDone} / {milesTotal} mi
               </span>
             </div>
             <input
@@ -325,22 +313,43 @@ export function RouteMap({
               aria-label="Move truck along selected route"
             />
             <div className="map-controls__ends">
-              <span>Start</span>
-              <span>End</span>
+              <span>Starting Location</span>
+              <span>Destination</span>
             </div>
+            {weatherAtTruck && (
+              <div className="weather-chip">
+                <span
+                  className="weather-chip__dot"
+                  style={{ background: RISK_COLORS[weatherAtTruck.risk as RiskLevel] }}
+                />
+                <div>
+                  <strong>
+                    {RISK_LABELS[weatherAtTruck.risk]} · mi {weatherAtTruck.mile.toFixed(0)}
+                  </strong>
+                  <div>
+                    Wind {weatherAtTruck.weather.wind_mph} mph · Rain{" "}
+                    {weatherAtTruck.weather.rain_in_hr} in/hr · Snow{" "}
+                    {weatherAtTruck.weather.snow_in_hr} in/hr
+                    {weatherAtTruck.weather.temperature_f != null
+                      ? ` · ${weatherAtTruck.weather.temperature_f}°F`
+                      : ""}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {onForecastHourChange && data.heatmap?.hours > 0 && (
-            <div className="map-controls__row map-controls__row--hours">
+            <div className="map-controls__block map-controls__block--hours">
               <div className="map-controls__head">
-                <strong>0–48h outlook</strong>
+                <strong>0–48h corridor outlook</strong>
                 <span>
-                  +{forecastHour}h
-                  {forecastSummary
-                    ? ` · ${RISK_LABELS[forecastSummary.dominantRisk]}`
-                    : ""}
+                  +{forecastHour}h · {forecastLabel}
                 </span>
               </div>
+              <p className="map-controls__hint">
+                Drag this slider to change the forecast hour (not trip miles).
+              </p>
               <input
                 type="range"
                 className="map-range"
@@ -351,15 +360,29 @@ export function RouteMap({
                 aria-label="Forecast hour 0 to 48"
               />
               <div className="map-controls__ends">
-                <span>Now</span>
+                <span>Now (+0h)</span>
                 <span>+{Math.max(0, data.heatmap.hours - 1)}h</span>
               </div>
-              <p className="map-controls__meta">
-                {forecastLabel}
-                {forecastSummary?.sampleWind != null
-                  ? ` · wind ${forecastSummary.sampleWind.toFixed(0)} mph`
-                  : ""}
-              </p>
+              {forecastSummary && (
+                <div className="weather-chip">
+                  <span
+                    className="weather-chip__dot"
+                    style={{ background: RISK_COLORS[forecastSummary.dominantRisk] }}
+                  />
+                  <div>
+                    <strong>
+                      Corridor risk at +{forecastHour}h:{" "}
+                      {RISK_LABELS[forecastSummary.dominantRisk]}
+                    </strong>
+                    <div>
+                      Avg score {forecastSummary.avgScore.toFixed(2)}
+                      {forecastSummary.sampleWind != null
+                        ? ` · corridor wind ${forecastSummary.sampleWind.toFixed(0)} mph`
+                        : ""}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -525,7 +548,7 @@ function drawRoutesAnimated(
         map.moveLayer(`${id}-line`);
       }
     } catch {
-      /* ignore */
+      // Layer may not exist yet during first paint.
     }
 
     const source = map.getSource(id) as mapboxgl.GeoJSONSource;

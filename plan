@@ -4,9 +4,9 @@
 
 Build a **React + Django** app where a driver enters origin, destination, departure date/time, and load weight; the app returns **3 routes**, weather-sampled checkpoints, risk scores (with load rules), a **recommended route**, a map of all of that, and a **corridor weather heatmap with a 48-hour forecast slider**.
 
-**Out of scope:** HOS/ELD logs, multi-stop pickup chains, auth, social features, truck animations, anything not in the brief.
+**Out of scope:** HOS/ELD logs, multi-stop pickup chains, auth, social features, anything not in the brief.
 
-**Cost constraint:** $0 — free APIs and free hosting only (Nominatim, OSRM, Open-Meteo, MapLibre/OpenFreeMap, Vercel Hobby).
+**Cost constraint:** $0 — free APIs and free hosting only (Nominatim, OSRM, Open-Meteo, Esri tiles via Mapbox GL JS, Vercel Hobby).
 
 ## Decoded rules (from garbled MD — treat as source of truth)
 
@@ -35,7 +35,7 @@ Build a **React + Django** app where a driver enters origin, destination, depart
 | Piece | Choice |
 | --- | --- |
 | Frontend | Vite + React + TypeScript |
-| Map | MapLibre GL + OpenFreeMap (no token) |
+| Map | Mapbox GL JS + free Esri street/satellite tiles (no token) |
 | Backend | Django 4 + DRF |
 | Geocode | Nominatim |
 | 3 routes | OSRM (`alternatives` + via midpoints if needed) |

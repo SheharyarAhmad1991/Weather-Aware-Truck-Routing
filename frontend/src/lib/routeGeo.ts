@@ -1,4 +1,4 @@
-/** Polyline helpers for truck scrubber (RoadWatch-style). */
+/** Polyline helpers for trip progress scrubbing. */
 export type LngLat = [number, number];
 
 export interface RouteIndex {

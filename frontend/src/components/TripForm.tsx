@@ -42,8 +42,8 @@ export function TripForm({ loading, onSubmit }: Props) {
     <form className="trip-form" onSubmit={handleSubmit}>
       <h1>Weather-Aware Truck Routing</h1>
       <p className="lede">
-        Plan a haul with up to three alternatives scored on weather, cargo weight, and drive
-        time.
+        Enter origin, destination, departure time, and cargo weight. Compare up to three
+        routes scored on weather risk and travel time.
       </p>
 
       <LocationInput
@@ -96,7 +96,7 @@ export function TripForm({ loading, onSubmit }: Props) {
       </fieldset>
 
       <button type="submit" className="primary" disabled={loading}>
-        {loading ? "Scoring corridors…" : "Compare routes"}
+        {loading ? "Comparing routes…" : "Compare routes"}
       </button>
     </form>
   );

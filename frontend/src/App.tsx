@@ -73,10 +73,10 @@ export default function App() {
           <TripForm loading={loading} onSubmit={handleSubmit} />
           {error && <div className="error">{error}</div>}
           {loading && (
-            <p className="status-line">Routing + weather scoring in progress…</p>
+            <p className="status-line">Fetching routes and weather…</p>
           )}
           {!data && !loading && !error && (
-            <p className="status-line">Enter a trip above to score up to three corridors.</p>
+            <p className="status-line">Submit a trip to compare up to three routes.</p>
           )}
           {data && (
             <RoutePanel data={data} selectedId={selectedId} onSelect={setSelectedId} />

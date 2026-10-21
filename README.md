@@ -1,6 +1,6 @@
 # Weather-Aware Truck Routing
 
-A React + Django tool for drivers who need the **safest practical corridor** when weather, cargo weight, and schedule all matter.
+React + Django assessment app that scores truck routes on weather risk, cargo weight, and travel time.
 
 > **Repository:** https://github.com/SheharyarAhmad1991/Weather-Aware-Truck-Routing  
 > **Web app:** https://weather-aware-frontend.vercel.app  

@@ -1,6 +1,5 @@
 import type { AnalyzeResponse, RouteResult } from "../types";
-import { RISK_LABELS } from "../lib/riskColors";
-import { ROUTE_PALETTE } from "./RouteMap";
+import { ROUTE_PALETTE } from "../lib/routePalette";
 
 interface Props {
   data: AnalyzeResponse;
@@ -17,7 +16,7 @@ function fmtDuration(min: number): string {
 export function RoutePanel({ data, selectedId, onSelect }: Props) {
   return (
     <div className="route-panel">
-      <h2>Corridor options</h2>
+      <h2>Route options</h2>
       <ul>
         {data.routes.map((r, i) => (
           <RouteCard
@@ -71,11 +70,6 @@ function RouteCard({
         </div>
         {route.is_recommended && route.recommendation_reason && (
           <p className="why">{route.recommendation_reason}</p>
-        )}
-        {active && route.checkpoints[0] && (
-          <p className="hint">
-            First checkpoint: {RISK_LABELS[route.checkpoints[0].risk]}
-          </p>
         )}
       </button>
     </li>

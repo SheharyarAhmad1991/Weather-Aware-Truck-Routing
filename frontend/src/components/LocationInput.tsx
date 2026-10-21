@@ -65,12 +65,11 @@ export function LocationInput({ id, label, value, onChange }: Props) {
           if (first) CACHE.delete(first);
         }
         applyResults(results);
-      } catch (err) {
+      } catch {
         if (ctrl.signal.aborted || idNow !== reqId.current) return;
         setSuggestions([]);
         setOpen(false);
         setHint("Place search unavailable");
-        void err;
       }
     }, DEBOUNCE_MS);
   }
