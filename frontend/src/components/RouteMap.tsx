@@ -303,28 +303,74 @@ export function RouteMap({
         </div>
       )}
 
-      {data && (
-        <div className="map-bottom-panel">
-          {onForecastHourChange && (
-            <div className="hour-scrubber">
-              <div className="hour-scrubber__head">
+      {data && selectedRoute && (
+        <div className="map-controls">
+          <div className="map-controls__block">
+            <div className="map-controls__head">
+              <strong>Trip progress</strong>
+              <span>
+                {milesDone} / {milesTotal} mi
+              </span>
+            </div>
+            <input
+              type="range"
+              className="map-range"
+              min={0}
+              max={1000}
+              value={Math.round(progress * 1000)}
+              onChange={(e) => setProgress(Number(e.target.value) / 1000)}
+              aria-label="Move truck along selected route"
+            />
+            <div className="map-controls__ends">
+              <span>Starting Location</span>
+              <span>Destination</span>
+            </div>
+            {weatherAtTruck && (
+              <div className="weather-chip">
+                <span
+                  className="weather-chip__dot"
+                  style={{ background: RISK_COLORS[weatherAtTruck.risk as RiskLevel] }}
+                />
+                <div>
+                  <strong>
+                    {RISK_LABELS[weatherAtTruck.risk]} · mi {weatherAtTruck.mile.toFixed(0)}
+                  </strong>
+                  <div>
+                    Wind {weatherAtTruck.weather.wind_mph} mph · Rain{" "}
+                    {weatherAtTruck.weather.rain_in_hr} in/hr · Snow{" "}
+                    {weatherAtTruck.weather.snow_in_hr} in/hr
+                    {weatherAtTruck.weather.temperature_f != null
+                      ? ` · ${weatherAtTruck.weather.temperature_f}°F`
+                      : ""}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {onForecastHourChange && data.heatmap?.hours > 0 && (
+            <div className="map-controls__block map-controls__block--hours">
+              <div className="map-controls__head">
                 <strong>0–48h corridor outlook</strong>
                 <span>
                   +{forecastHour}h · {forecastLabel}
                 </span>
               </div>
+              <p className="map-controls__hint">
+                Drag this slider to change the forecast hour (not trip miles).
+              </p>
               <input
                 type="range"
                 className="map-range"
                 min={0}
-                max={Math.max(0, (data.heatmap?.hours ?? 49) - 1)}
+                max={Math.max(0, data.heatmap.hours - 1)}
                 value={forecastHour}
                 onChange={(e) => onForecastHourChange(Number(e.target.value))}
-                aria-label="Forecast hour from now through 48 hours"
+                aria-label="Forecast hour 0 to 48"
               />
-              <div className="hour-scrubber__ends">
-                <span>Now (0h)</span>
-                <span>+{Math.max(0, (data.heatmap?.hours ?? 49) - 1)}h</span>
+              <div className="map-controls__ends">
+                <span>Now (+0h)</span>
+                <span>+{Math.max(0, data.heatmap.hours - 1)}h</span>
               </div>
               {forecastSummary && (
                 <div className="weather-chip">
@@ -341,52 +387,6 @@ export function RouteMap({
                       Avg score {forecastSummary.avgScore.toFixed(2)}
                       {forecastSummary.sampleWind != null
                         ? ` · corridor wind ${forecastSummary.sampleWind.toFixed(0)} mph`
-                        : ""}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedRoute && (
-            <div className="truck-scrubber">
-              <div className="truck-scrubber__head">
-                <strong>Trip progress</strong>
-                <span>
-                  {milesDone} / {milesTotal} mi
-                </span>
-              </div>
-              <input
-                type="range"
-                className="map-range"
-                min={0}
-                max={1000}
-                value={Math.round(progress * 1000)}
-                onChange={(e) => setProgress(Number(e.target.value) / 1000)}
-                aria-label="Move truck along selected route"
-              />
-              <div className="truck-scrubber__ends">
-                <span>Starting Location</span>
-                <span>Destination</span>
-              </div>
-              {weatherAtTruck && (
-                <div className="weather-chip">
-                  <span
-                    className="weather-chip__dot"
-                    style={{ background: RISK_COLORS[weatherAtTruck.risk as RiskLevel] }}
-                  />
-                  <div>
-                    <strong>
-                      {RISK_LABELS[weatherAtTruck.risk]} · mi{" "}
-                      {weatherAtTruck.mile.toFixed(0)}
-                    </strong>
-                    <div>
-                      Wind {weatherAtTruck.weather.wind_mph} mph · Rain{" "}
-                      {weatherAtTruck.weather.rain_in_hr} in/hr · Snow{" "}
-                      {weatherAtTruck.weather.snow_in_hr} in/hr
-                      {weatherAtTruck.weather.temperature_f != null
-                        ? ` · ${weatherAtTruck.weather.temperature_f}°F`
                         : ""}
                     </div>
                   </div>
