@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { analyzeRoutes } from "./api/client";
-import { HeatmapSlider } from "./components/HeatmapSlider";
 import { RouteMap } from "./components/RouteMap";
 import { RoutePanel } from "./components/RoutePanel";
 import { TripForm } from "./components/TripForm";
@@ -95,16 +94,14 @@ export default function App() {
       </aside>
 
       <main className="main">
-        <RouteMap data={data} selectedId={selectedId} forecastHour={forecastHour} />
-        {data && (
-          <HeatmapSlider
-            hour={forecastHour}
-            maxHours={data.heatmap.hours}
-            label={hourLabel}
-            summary={forecastSummary}
-            onChange={setForecastHour}
-          />
-        )}
+        <RouteMap
+          data={data}
+          selectedId={selectedId}
+          forecastHour={forecastHour}
+          forecastLabel={hourLabel}
+          forecastSummary={forecastSummary}
+          onForecastHourChange={setForecastHour}
+        />
       </main>
     </div>
   );

@@ -70,13 +70,29 @@ function applyFreeBasemap(map: mapboxgl.Map, mode: BasemapMode) {
   map.setLayoutProperty("basemap-labels", "visibility", streets ? "none" : "visible");
 }
 
+interface ForecastSummary {
+  avgScore: number;
+  dominantRisk: RiskLevel;
+  sampleWind: number | null;
+}
+
 interface Props {
   data: AnalyzeResponse | null;
   selectedId: string | null;
   forecastHour: number;
+  forecastLabel?: string;
+  forecastSummary?: ForecastSummary | null;
+  onForecastHourChange?: (hour: number) => void;
 }
 
-export function RouteMap({ data, selectedId, forecastHour }: Props) {
+export function RouteMap({
+  data,
+  selectedId,
+  forecastHour,
+  forecastLabel = "—",
+  forecastSummary = null,
+  onForecastHourChange,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const readyRef = useRef(false);
@@ -287,45 +303,95 @@ export function RouteMap({ data, selectedId, forecastHour }: Props) {
         </div>
       )}
 
-      {data && selectedRoute && (
-        <div className="truck-scrubber">
-          <div className="truck-scrubber__head">
-            <strong>Trip progress</strong>
-            <span>
-              {milesDone} / {milesTotal} mi
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={1000}
-            value={Math.round(progress * 1000)}
-            onChange={(e) => setProgress(Number(e.target.value) / 1000)}
-            aria-label="Move truck along selected route"
-          />
-          <div className="truck-scrubber__ends">
-            <span>Starting Location</span>
-            <span>Destination</span>
-          </div>
-          {weatherAtTruck && (
-            <div className="weather-chip">
-              <span
-                className="weather-chip__dot"
-                style={{ background: RISK_COLORS[weatherAtTruck.risk as RiskLevel] }}
-              />
-              <div>
-                <strong>
-                  {RISK_LABELS[weatherAtTruck.risk]} · mi {weatherAtTruck.mile.toFixed(0)}
-                </strong>
-                <div>
-                  Wind {weatherAtTruck.weather.wind_mph} mph · Rain{" "}
-                  {weatherAtTruck.weather.rain_in_hr} in/hr · Snow{" "}
-                  {weatherAtTruck.weather.snow_in_hr} in/hr
-                  {weatherAtTruck.weather.temperature_f != null
-                    ? ` · ${weatherAtTruck.weather.temperature_f}°F`
-                    : ""}
-                </div>
+      {data && (
+        <div className="map-bottom-panel">
+          {onForecastHourChange && (
+            <div className="hour-scrubber">
+              <div className="hour-scrubber__head">
+                <strong>0–48h corridor outlook</strong>
+                <span>
+                  +{forecastHour}h · {forecastLabel}
+                </span>
               </div>
+              <input
+                type="range"
+                className="map-range"
+                min={0}
+                max={Math.max(0, (data.heatmap?.hours ?? 49) - 1)}
+                value={forecastHour}
+                onChange={(e) => onForecastHourChange(Number(e.target.value))}
+                aria-label="Forecast hour from now through 48 hours"
+              />
+              <div className="hour-scrubber__ends">
+                <span>Now (0h)</span>
+                <span>+{Math.max(0, (data.heatmap?.hours ?? 49) - 1)}h</span>
+              </div>
+              {forecastSummary && (
+                <div className="weather-chip">
+                  <span
+                    className="weather-chip__dot"
+                    style={{ background: RISK_COLORS[forecastSummary.dominantRisk] }}
+                  />
+                  <div>
+                    <strong>
+                      Corridor risk at +{forecastHour}h:{" "}
+                      {RISK_LABELS[forecastSummary.dominantRisk]}
+                    </strong>
+                    <div>
+                      Avg score {forecastSummary.avgScore.toFixed(2)}
+                      {forecastSummary.sampleWind != null
+                        ? ` · corridor wind ${forecastSummary.sampleWind.toFixed(0)} mph`
+                        : ""}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedRoute && (
+            <div className="truck-scrubber">
+              <div className="truck-scrubber__head">
+                <strong>Trip progress</strong>
+                <span>
+                  {milesDone} / {milesTotal} mi
+                </span>
+              </div>
+              <input
+                type="range"
+                className="map-range"
+                min={0}
+                max={1000}
+                value={Math.round(progress * 1000)}
+                onChange={(e) => setProgress(Number(e.target.value) / 1000)}
+                aria-label="Move truck along selected route"
+              />
+              <div className="truck-scrubber__ends">
+                <span>Starting Location</span>
+                <span>Destination</span>
+              </div>
+              {weatherAtTruck && (
+                <div className="weather-chip">
+                  <span
+                    className="weather-chip__dot"
+                    style={{ background: RISK_COLORS[weatherAtTruck.risk as RiskLevel] }}
+                  />
+                  <div>
+                    <strong>
+                      {RISK_LABELS[weatherAtTruck.risk]} · mi{" "}
+                      {weatherAtTruck.mile.toFixed(0)}
+                    </strong>
+                    <div>
+                      Wind {weatherAtTruck.weather.wind_mph} mph · Rain{" "}
+                      {weatherAtTruck.weather.rain_in_hr} in/hr · Snow{" "}
+                      {weatherAtTruck.weather.snow_in_hr} in/hr
+                      {weatherAtTruck.weather.temperature_f != null
+                        ? ` · ${weatherAtTruck.weather.temperature_f}°F`
+                        : ""}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
