@@ -304,12 +304,15 @@ export function RouteMap({
       )}
 
       {data && selectedRoute && (
-        <div className="map-controls">
-          <div className="map-controls__block">
+        <div className="map-controls" aria-label="Route and forecast controls">
+          <div className="map-controls__row">
             <div className="map-controls__head">
               <strong>Trip progress</strong>
               <span>
-                {milesDone} / {milesTotal} mi
+                {milesDone}/{milesTotal} mi
+                {weatherAtTruck
+                  ? ` · ${RISK_LABELS[weatherAtTruck.risk]}`
+                  : ""}
               </span>
             </div>
             <input
@@ -322,43 +325,22 @@ export function RouteMap({
               aria-label="Move truck along selected route"
             />
             <div className="map-controls__ends">
-              <span>Starting Location</span>
-              <span>Destination</span>
+              <span>Start</span>
+              <span>End</span>
             </div>
-            {weatherAtTruck && (
-              <div className="weather-chip">
-                <span
-                  className="weather-chip__dot"
-                  style={{ background: RISK_COLORS[weatherAtTruck.risk as RiskLevel] }}
-                />
-                <div>
-                  <strong>
-                    {RISK_LABELS[weatherAtTruck.risk]} · mi {weatherAtTruck.mile.toFixed(0)}
-                  </strong>
-                  <div>
-                    Wind {weatherAtTruck.weather.wind_mph} mph · Rain{" "}
-                    {weatherAtTruck.weather.rain_in_hr} in/hr · Snow{" "}
-                    {weatherAtTruck.weather.snow_in_hr} in/hr
-                    {weatherAtTruck.weather.temperature_f != null
-                      ? ` · ${weatherAtTruck.weather.temperature_f}°F`
-                      : ""}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {onForecastHourChange && data.heatmap?.hours > 0 && (
-            <div className="map-controls__block map-controls__block--hours">
+            <div className="map-controls__row map-controls__row--hours">
               <div className="map-controls__head">
-                <strong>0–48h corridor outlook</strong>
+                <strong>0–48h outlook</strong>
                 <span>
-                  +{forecastHour}h · {forecastLabel}
+                  +{forecastHour}h
+                  {forecastSummary
+                    ? ` · ${RISK_LABELS[forecastSummary.dominantRisk]}`
+                    : ""}
                 </span>
               </div>
-              <p className="map-controls__hint">
-                Drag this slider to change the forecast hour (not trip miles).
-              </p>
               <input
                 type="range"
                 className="map-range"
@@ -369,29 +351,15 @@ export function RouteMap({
                 aria-label="Forecast hour 0 to 48"
               />
               <div className="map-controls__ends">
-                <span>Now (+0h)</span>
+                <span>Now</span>
                 <span>+{Math.max(0, data.heatmap.hours - 1)}h</span>
               </div>
-              {forecastSummary && (
-                <div className="weather-chip">
-                  <span
-                    className="weather-chip__dot"
-                    style={{ background: RISK_COLORS[forecastSummary.dominantRisk] }}
-                  />
-                  <div>
-                    <strong>
-                      Corridor risk at +{forecastHour}h:{" "}
-                      {RISK_LABELS[forecastSummary.dominantRisk]}
-                    </strong>
-                    <div>
-                      Avg score {forecastSummary.avgScore.toFixed(2)}
-                      {forecastSummary.sampleWind != null
-                        ? ` · corridor wind ${forecastSummary.sampleWind.toFixed(0)} mph`
-                        : ""}
-                    </div>
-                  </div>
-                </div>
-              )}
+              <p className="map-controls__meta">
+                {forecastLabel}
+                {forecastSummary?.sampleWind != null
+                  ? ` · wind ${forecastSummary.sampleWind.toFixed(0)} mph`
+                  : ""}
+              </p>
             </div>
           )}
         </div>
